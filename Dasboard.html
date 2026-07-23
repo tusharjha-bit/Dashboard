@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NIFTY 50 // GBM MONTE CARLO TERMINAL</title>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+  :root{
+    --bg:#000000;
+    --panel:#0a0a0a;
+    --panel-border:#2b2200;
+    --amber:#ff9f0a;
+    --amber-dim:#c97e00;
+    --amber-bright:#ffc266;
+    --green:#2ecc71;
+    --red:#ff3b30;
+    --cyan:#3ad6d6;
+    --white:#e8e8e8;
+    --grey:#6b6b6b;
+    --mono: 'IBM Plex Mono','Consolas','Roboto Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;background:var(--bg);color:var(--white);
+    font-family:var(--mono);
+    -webkit-font-smoothing:antialiased;
+  }
+  body{padding:14px 18px 60px;}
+
+  /* ===== TOP TICKER BAR ===== */
+  .ticker-bar{
+    display:flex;align-items:center;justify-content:space-between;
+    background:linear-gradient(180deg,#151005,#0a0800);
+    border:1px solid var(--panel-border);
+    padding:10px 16px;margin-bottom:14px;
+    box-shadow:0 0 12px rgba(255,159,10,0.08) inset;
+  }
+  .ticker-left{display:flex;align-items:baseline;gap:14px;}
+  .ticker-symbol{font-size:20px;font-weight:700;color:var(--amber);letter-spacing:1px;}
+  .ticker-name{font-size:11px;color:var(--grey);letter-spacing:2px;text-transform:uppercase;}
+  .ticker-price{font-size:26px;font-weight:700;color:var(--white);}
+  .ticker-chg{font-size:14px;font-weight:600;padding:2px 8px;border-radius:2px;}
+  .up{color:var(--green);}
+  .down{color:var(--red);}
+  .chg-badge.up{background:rgba(46,204,113,0.12);}
+  .chg-badge.down{background:rgba(255,59,48,0.12);}
+  .ticker-right{font-size:10px;color:var(--grey);text-align:right;letter-spacing:1px;}
+  .blink{animation:blink 1.6s infinite;}
+  @keyframes blink{0%,49%{opacity:1;}50%,100%{opacity:0.25;}}
+
+  /* ===== SECTION FRAME ===== */
+  .section{
+    border:1px solid var(--panel-border);
+    background:var(--panel);
+    margin-bottom:14px;
+  }
+  .section-head{
+    display:flex;align-items:center;gap:10px;
+    background:#120d00;
+    border-bottom:1px solid var(--panel-border);
+    padding:7px 14px;
+  }
+  .section-tag{
+    font-size:11px;color:#000;background:var(--amber);
+    padding:2px 7px;font-weight:700;letter-spacing:1px;
+  }
+  .section-title{
+    font-size:12px;color:var(--amber-bright);letter-spacing:2px;text-transform:uppercase;
+  }
+  .section-body{padding:16px;}
+
+  /* ===== SECTION A: SUMMARY CARDS ===== */
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .stat-card{
+    border:1px solid #201800;background:#0d0a00;padding:12px 14px;
+  }
+  .stat-label{font-size:10px;color:var(--grey);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
+  .stat-value{font-size:22px;font-weight:700;color:var(--amber-bright);}
+  .stat-sub{font-size:10.5px;color:var(--grey);margin-top:5px;}
+
+  /* ===== SECTION B: TABLE ===== */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{
+    text-align:right;color:#000;background:var(--amber);
+    padding:7px 10px;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;
+  }
+  th:first-child,td:first-child{text-align:left;}
+  td{padding:7px 10px;border-bottom:1px solid #1a1400;text-align:right;color:var(--white);}
+  tr:nth-child(even) td{background:#0d0d0400;}
+  tr:hover td{background:#141000;}
+  .row-median td{background:#1c1400 !important;color:var(--amber-bright);font-weight:700;}
+  .pos{color:var(--green);}
+  .neg{color:var(--red);}
+
+  /* ===== SECTION C: PROBABILITY GRID ===== */
+  .prob-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .prob-card{
+    border:1px solid #201800;padding:14px 12px;text-align:center;
+    position:relative;overflow:hidden;
+  }
+  .prob-card.bull{background:rgba(46,204,113,0.06);border-color:#123321;}
+  .prob-card.bear{background:rgba(255,59,48,0.06);border-color:#3a1512;}
+  .prob-card.neutral{background:rgba(255,159,10,0.06);border-color:#3a2a00;}
+  .prob-pct{font-size:26px;font-weight:700;}
+  .prob-card.bull .prob-pct{color:var(--green);}
+  .prob-card.bear .prob-pct{color:var(--red);}
+  .prob-card.neutral .prob-pct{color:var(--amber-bright);}
+  .prob-label{font-size:10px;color:var(--grey);letter-spacing:1px;text-transform:uppercase;margin-top:6px;}
+
+  /* ===== SECTION D: CHARTS ===== */
+  .chart-box{border:1px solid #1a1400;margin-bottom:14px;background:#050400;}
+  .chart-title{
+    font-size:10.5px;color:var(--amber-dim);letter-spacing:1.5px;text-transform:uppercase;
+    padding:8px 12px;border-bottom:1px solid #1a1400;
+  }
+
+  /* ===== INTERPRETATION ===== */
+  .interp{
+    border:1px solid var(--panel-border);background:#0a0800;
+    padding:16px;font-size:12.5px;line-height:1.7;color:#cfcfcf;
+  }
+  .interp .lbl{color:var(--amber);font-weight:700;letter-spacing:1px;font-size:11px;display:block;margin-bottom:8px;}
+
+  .footer-note{
+    font-size:10px;color:var(--grey);text-align:center;margin-top:18px;letter-spacing:0.5px;
+  }
+
+  @media(max-width:900px){
+    .grid-3{grid-template-columns:1fr;}
+    .prob-grid{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<div class="ticker-bar">
+  <div class="ticker-left">
+    <span class="ticker-symbol">NIFTY 50</span>
+    <span class="ticker-name">NSE INDEX</span>
+    <span class="ticker-price" id="tkPrice">--</span>
+    <span class="ticker-chg chg-badge" id="tkChg">--</span>
+  </div>
+  <div class="ticker-right">
+    LIVE REF: 22 JUL 2026 &nbsp;|&nbsp; <span class="blink">● SIMULATION ENGINE READY</span>
+  </div>
+</div>
+
+<!-- SECTION A -->
+<div class="section">
+  <div class="section-head"><span class="section-tag">A</span><span class="section-title">Market Summary</span></div>
+  <div class="section-body">
+    <div class="grid-3">
+      <div class="stat-card">
+        <div class="stat-label">Current Price (Spot)</div>
+        <div class="stat-value" id="statSpot">--</div>
+        <div class="stat-sub" id="statSpotSub">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Annualised Volatility</div>
+        <div class="stat-value" id="statVol">--</div>
+        <div class="stat-sub">from monthly log-returns, n=<span id="statN">--</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Annualised Drift (μ)</div>
+        <div class="stat-value" id="statDrift">--</div>
+        <div class="stat-sub" id="statDriftSub">--</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION B -->
+<div class="section">
+  <div class="section-head"><span class="section-tag">B</span><span class="section-title">Simulation Results — 30 Trading-Day Horizon (10,000 Paths)</span></div>
+  <div class="section-body">
+    <table>
+      <thead>
+        <tr><th>Metric</th><th>Price (₹)</th><th>Δ vs Spot</th><th>% Change</th></tr>
+      </thead>
+      <tbody id="resultsTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SECTION C -->
+<div class="section">
+  <div class="section-head"><span class="section-tag">C</span><span class="section-title">Probability Grid</span></div>
+  <div class="section-body">
+    <div class="prob-grid" id="probGrid"></div>
+  </div>
+</div>
+
+<!-- SECTION D -->
+<div class="section">
+  <div class="section-head"><span class="section-tag">D</span><span class="section-title">Simulation Charts</span></div>
+  <div class="section-body">
+    <div class="chart-box">
+      <div class="chart-title">Simulated Price Paths — sample of 150 / 10,000</div>
+      <div id="chartPaths" style="width:100%;height:400px;"></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Distribution of Day-30 Terminal Prices</div>
+      <div id="chartHist" style="width:100%;height:380px;"></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Confidence Bands (P5–P95 / P25–P75) Over Horizon</div>
+      <div id="chartBands" style="width:100%;height:400px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- INTERPRETATION -->
+<div class="interp">
+  <span class="lbl">// INTERPRETATION</span>
+  <span id="interpText">Computing...</span>
+</div>
+
+<div class="footer-note">
+  MONTE CARLO GBM ENGINE · 10,000 PATHS · 30 TRADING DAYS · SEEDED FROM 43-MONTH LOG-RETURN SERIES (JAN 2023–JUL 2026, APPROXIMATE PUBLIC NSE CLOSES) · FOR ILLUSTRATIVE / EDUCATIONAL USE ONLY — NOT INVESTMENT ADVICE
+</div>
+
+<script>
+/* =========================================================
+   STEP 1 — HISTORICAL MONTHLY DATA (approx. NIFTY 50 closes)
+   Columns: date (YYYY-MM), close
+   ========================================================= */
+const historicalData = [
+  {date:"2023-01",close:17662},{date:"2023-02",close:17304},{date:"2023-03",close:17360},
+  {date:"2023-04",close:17828},{date:"2023-05",close:18535},{date:"2023-06",close:19189},
+  {date:"2023-07",close:19754},{date:"2023-08",close:19254},{date:"2023-09",close:19638},
+  {date:"2023-10",close:19080},{date:"2023-11",close:20133},{date:"2023-12",close:21731},
+  {date:"2024-01",close:21725},{date:"2024-02",close:21983},{date:"2024-03",close:22327},
+  {date:"2024-04",close:22604},{date:"2024-05",close:22531},{date:"2024-06",close:24011},
+  {date:"2024-07",close:24951},{date:"2024-08",close:25236},{date:"2024-09",close:25811},
+  {date:"2024-10",close:24205},{date:"2024-11",close:23532},{date:"2024-12",close:23645},
+  {date:"2025-01",close:23508},{date:"2025-02",close:22125},{date:"2025-03",close:23519},
+  {date:"2025-04",close:24334},{date:"2025-05",close:24751},{date:"2025-06",close:25517},
+  {date:"2025-07",close:24968},{date:"2025-08",close:24741},{date:"2025-09",close:24999},
+  {date:"2025-10",close:25358},{date:"2025-11",close:25938},{date:"2025-12",close:26216},
+  {date:"2026-01",close:26377},{date:"2026-02",close:25891},{date:"2026-03",close:25102},
+  {date:"2026-04",close:24560},{date:"2026-05",close:23980},{date:"2026-06",close:24450},
+  {date:"2026-07",close:23996.25}
+];
+
+const CURRENT_PRICE = 23996.25;   // live spot ref, 22 Jul 2026
+const PREV_CLOSE     = 24187.70;
+const WK52_HIGH       = 26373.20;
+const WK52_LOW        = 22182.55;
+
+/* ===== STEP 1 continued — sort + log returns ===== */
+historicalData.sort((a,b)=> new Date(a.date+"-01") - new Date(b.date+"-01"));
+
+const closes = historicalData.map(d=>d.close);
+const logReturns = [];
+for(let i=1;i<closes.length;i++){
+  logReturns.push(Math.log(closes[i]/closes[i-1]));
+}
+
+/* ===== STEP 2 — estimate mu, sigma ===== */
+function mean(arr){return arr.reduce((a,b)=>a+b,0)/arr.length;}
+function stdev(arr){
+  const m = mean(arr);
+  const v = arr.reduce((a,b)=>a+(b-m)*(b-m),0)/(arr.length-1);
+  return Math.sqrt(v);
+}
+const muMonthly    = mean(logReturns);
+const sigmaMonthly = stdev(logReturns);
+
+const muAnnual    = muMonthly * 12;
+const sigmaAnnual = sigmaMonthly * Math.sqrt(12);
+
+const TRADING_DAYS_YR = 252;
+const muDaily    = muAnnual / TRADING_DAYS_YR;
+const sigmaDaily = sigmaAnnual / Math.sqrt(TRADING_DAYS_YR);
+
+/* ===== STEP 3 — Monte Carlo GBM: 10,000 sims x 30 days ===== */
+const N_SIMS = 10000;
+const N_DAYS = 30;
+const S0 = CURRENT_PRICE;
+
+function randNormal(){
+  let u=0,v=0;
+  while(u===0) u = Math.random();
+  while(v===0) v = Math.random();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+// paths[sim][day], flattened for speed
+const paths = new Float64Array(N_SIMS*(N_DAYS+1));
+const pathMax = new Float64Array(N_SIMS);
+const pathMin = new Float64Array(N_SIMS);
+const drift = (muDaily - 0.5*sigmaDaily*sigmaDaily);
+
+for(let s=0;s<N_SIMS;s++){
+  let price = S0;
+  const base = s*(N_DAYS+1);
+  paths[base] = price;
+  let runMax = price, runMin = price;
+  for(let t=1;t<=N_DAYS;t++){
+    const z = randNormal();
+    price = price * Math.exp(drift + sigmaDaily*z);
+    paths[base+t] = price;
+    if(price>runMax) runMax = price;
+    if(price<runMin) runMin = price;
+  }
+  pathMax[s]=runMax;
+  pathMin[s]=runMin;
+}
+
+/* ===== STEP 4 — terminal distribution + percentiles ===== */
+const finalPrices = new Float64Array(N_SIMS);
+for(let s=0;s<N_SIMS;s++) finalPrices[s] = paths[s*(N_DAYS+1)+N_DAYS];
+
+const sortedFinal = Array.from(finalPrices).sort((a,b)=>a-b);
+
+function percentile(sortedArr,p){
+  const idx = (p/100)*(sortedArr.length-1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if(lo===hi) return sortedArr[lo];
+  const frac = idx-lo;
+  return sortedArr[lo] + (sortedArr[hi]-sortedArr[lo])*frac;
+}
+
+const expectedPrice = mean(Array.from(finalPrices));
+const medianPrice   = percentile(sortedFinal,50);
+const p5  = percentile(sortedFinal,5);
+const p25 = percentile(sortedFinal,25);
+const p75 = percentile(sortedFinal,75);
+const p95 = percentile(sortedFinal,95);
+
+/* ===== Probabilities ===== */
+let cUp=0,cDown=0,cGain5=0,cLoss5=0,cGain10=0,cLoss10=0,cRangeBound=0,cNewHigh=0,cBreachLow=0;
+for(let s=0;s<N_SIMS;s++){
+  const fp = finalPrices[s];
+  const ret = (fp - S0)/S0;
+  if(fp>S0) cUp++; else if(fp<S0) cDown++;
+  if(ret>0.05) cGain5++;
+  if(ret<-0.05) cLoss5++;
+  if(ret>0.10) cGain10++;
+  if(ret<-0.10) cLoss10++;
+  if(Math.abs(ret)<=0.02) cRangeBound++;
+  if(pathMax[s]>WK52_HIGH) cNewHigh++;
+  if(pathMin[s]<WK52_LOW) cBreachLow++;
+}
+const pct = x => (100*x/N_SIMS);
+
+/* =========================================================
+   RENDER — SECTION A
+   ========================================================= */
+const chgAbs = CURRENT_PRICE - PREV_CLOSE;
+const chgPct = 100*chgAbs/PREV_CLOSE;
+const chgUp = chgAbs>=0;
+document.getElementById('tkPrice').textContent = "₹"+CURRENT_PRICE.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const tkChgEl = document.getElementById('tkChg');
+tkChgEl.textContent = (chgUp?"▲ ":"▼ ")+Math.abs(chgAbs).toFixed(2)+" ("+(chgUp?"+":"")+chgPct.toFixed(2)+"%)";
+tkChgEl.classList.add(chgUp?'up':'down','chg-badge',chgUp?'up':'down');
+
+document.getElementById('statSpot').textContent = "₹"+S0.toLocaleString('en-IN',{minimumFractionDigits:2});
+document.getElementById('statSpotSub').textContent = "Prev close ₹"+PREV_CLOSE.toLocaleString('en-IN')+" · 52W range ₹"+WK52_LOW.toLocaleString('en-IN')+" – ₹"+WK52_HIGH.toLocaleString('en-IN');
+document.getElementById('statVol').textContent = (sigmaAnnual*100).toFixed(2)+"%";
+document.getElementById('statN').textContent = logReturns.length;
+document.getElementById('statDrift').textContent = (muAnnual>=0?"+":"")+(muAnnual*100).toFixed(2)+"%";
+document.getElementById('statDriftSub').textContent = "Daily μ="+(muDaily*100).toFixed(4)+"% · Daily σ="+(sigmaDaily*100).toFixed(4)+"%";
+
+/* =========================================================
+   RENDER — SECTION B (table)
+   ========================================================= */
+const rows = [
+  {label:"P5  (Bear case)",  price:p5},
+  {label:"P25",              price:p25},
+  {label:"Median (P50)",     price:medianPrice, median:true},
+  {label:"Expected (Mean)",  price:expectedPrice},
+  {label:"P75",              price:p75},
+  {label:"P95  (Bull case)", price:p95},
+];
+const tbody = document.getElementById('resultsTbody');
+rows.forEach(r=>{
+  const delta = r.price - S0;
+  const pctChg = 100*delta/S0;
+  const cls = delta>=0 ? 'pos' : 'neg';
+  const tr = document.createElement('tr');
+  if(r.median) tr.classList.add('row-median');
+  tr.innerHTML = `<td>${r.label}</td>
+    <td>₹${r.price.toLocaleString('en-IN',{maximumFractionDigits:2,minimumFractionDigits:2})}</td>
+    <td class="${cls}">${delta>=0?'+':''}${delta.toLocaleString('en-IN',{maximumFractionDigits:2,minimumFractionDigits:2})}</td>
+    <td class="${cls}">${pctChg>=0?'+':''}${pctChg.toFixed(2)}%</td>`;
+  tbody.appendChild(tr);
+});
+
+/* =========================================================
+   RENDER — SECTION C (probability grid)
+   ========================================================= */
+const probCards = [
+  {label:"Prob. Price Ends Higher", val:pct(cUp), type:"bull"},
+  {label:"Prob. Price Ends Lower",  val:pct(cDown), type:"bear"},
+  {label:"Prob. Gain > 5%",         val:pct(cGain5), type:"bull"},
+  {label:"Prob. Loss > 5%",         val:pct(cLoss5), type:"bear"},
+  {label:"Prob. Gain > 10%",        val:pct(cGain10), type:"bull"},
+  {label:"Prob. Loss > 10%",        val:pct(cLoss10), type:"bear"},
+  {label:"Prob. Range-Bound (±2%)", val:pct(cRangeBound), type:"neutral"},
+  {label:"Prob. New 52W High Touch",val:pct(cNewHigh), type:"bull"},
+];
+const probGrid = document.getElementById('probGrid');
+probCards.forEach(c=>{
+  const div = document.createElement('div');
+  div.className = "prob-card "+c.type;
+  div.innerHTML = `<div class="prob-pct">${c.val.toFixed(1)}%</div><div class="prob-label">${c.label}</div>`;
+  probGrid.appendChild(div);
+});
+
+/* =========================================================
+   RENDER — SECTION D (Plotly charts, dark theme)
+   ========================================================= */
+const plotlyDarkLayout = {
+  paper_bgcolor:'#050400',
+  plot_bgcolor:'#050400',
+  font:{family:"IBM Plex Mono, monospace", color:"#cfcfcf", size:11},
+  xaxis:{gridcolor:'#1a1400', zerolinecolor:'#2b2200', linecolor:'#2b2200'},
+  yaxis:{gridcolor:'#1a1400', zerolinecolor:'#2b2200', linecolor:'#2b2200'},
+  margin:{l:60,r:30,t:20,b:40},
+  showlegend:false
+};
+
+/* --- D1: Sample paths --- */
+const SAMPLE_N = 150;
+const pathTraces = [];
+for(let s=0;s<SAMPLE_N;s++){
+  const idx = Math.floor(s*(N_SIMS/SAMPLE_N));
+  const y = [];
+  for(let t=0;t<=N_DAYS;t++) y.push(paths[idx*(N_DAYS+1)+t]);
+  pathTraces.push({
+    x:[...Array(N_DAYS+1).keys()], y:y, type:'scatter', mode:'lines',
+    line:{color:'rgba(255,159,10,0.10)', width:1}, hoverinfo:'skip'
+  });
+}
+// mean path
+const meanPath = [];
+for(let t=0;t<=N_DAYS;t++){
+  let sum=0;
+  for(let s=0;s<N_SIMS;s++) sum += paths[s*(N_DAYS+1)+t];
+  meanPath.push(sum/N_SIMS);
+}
+pathTraces.push({
+  x:[...Array(N_DAYS+1).keys()], y:meanPath, type:'scatter', mode:'lines',
+  line:{color:'#ffc266', width:2.5}, name:'Mean path'
+});
+Plotly.newPlot('chartPaths', pathTraces, {...plotlyDarkLayout,
+  xaxis:{...plotlyDarkLayout.xaxis, title:'Trading Day'},
+  yaxis:{...plotlyDarkLayout.yaxis, title:'Price (₹)'}
+}, {displayModeBar:false, responsive:true});
+
+/* --- D2: Histogram --- */
+Plotly.newPlot('chartHist', [{
+  x:Array.from(finalPrices), type:'histogram', nbinsx:60,
+  marker:{color:'rgba(255,159,10,0.55)', line:{color:'#ff9f0a', width:0.5}}
+}], {...plotlyDarkLayout,
+  xaxis:{...plotlyDarkLayout.xaxis, title:'Day-30 Price (₹)'},
+  yaxis:{...plotlyDarkLayout.yaxis, title:'Frequency'},
+  shapes:[{type:'line', x0:S0, x1:S0, y0:0, y1:1, yref:'paper',
+    line:{color:'#3ad6d6', width:1.5, dash:'dash'}}],
+  annotations:[{x:S0, y:1, yref:'paper', text:'Spot', showarrow:false, yshift:12, font:{color:'#3ad6d6', size:10}}]
+}, {displayModeBar:false, responsive:true});
+
+/* --- D3: Confidence bands (fan chart) --- */
+const days = [...Array(N_DAYS+1).keys()];
+const bandP5=[],bandP25=[],bandP50=[],bandP75=[],bandP95=[];
+for(let t=0;t<=N_DAYS;t++){
+  const col = [];
+  for(let s=0;s<N_SIMS;s++) col.push(paths[s*(N_DAYS+1)+t]);
+  col.sort((a,b)=>a-b);
+  bandP5.push(percentile(col,5));
+  bandP25.push(percentile(col,25));
+  bandP50.push(percentile(col,50));
+  bandP75.push(percentile(col,75));
+  bandP95.push(percentile(col,95));
+}
+const bandTraces = [
+  {x:days, y:bandP95, type:'scatter', mode:'lines', line:{width:0}, showlegend:false, hoverinfo:'skip'},
+  {x:days, y:bandP5, type:'scatter', mode:'lines', line:{width:0}, fill:'tonexty',
+    fillcolor:'rgba(255,159,10,0.10)', name:'P5–P95', hoverinfo:'skip'},
+  {x:days, y:bandP75, type:'scatter', mode:'lines', line:{width:0}, showlegend:false, hoverinfo:'skip'},
+  {x:days, y:bandP25, type:'scatter', mode:'lines', line:{width:0}, fill:'tonexty',
+    fillcolor:'rgba(255,159,10,0.25)', name:'P25–P75', hoverinfo:'skip'},
+  {x:days, y:bandP50, type:'scatter', mode:'lines', line:{color:'#ffc266', width:2.5}, name:'Median'}
+];
+Plotly.newPlot('chartBands', bandTraces, {...plotlyDarkLayout,
+  xaxis:{...plotlyDarkLayout.xaxis, title:'Trading Day'},
+  yaxis:{...plotlyDarkLayout.yaxis, title:'Price (₹)'}
+}, {displayModeBar:false, responsive:true});
+
+/* =========================================================
+   INTERPRETATION TEXT
+   ========================================================= */
+const upBias = expectedPrice>=S0;
+const interp = `Based on ${logReturns.length} months of historical log-returns, NIFTY 50 carries an estimated annualised volatility of ${(sigmaAnnual*100).toFixed(1)}% and an annualised drift of ${(muAnnual*100).toFixed(1)}%, implying a 30-trading-day GBM median outcome of ₹${medianPrice.toLocaleString('en-IN',{maximumFractionDigits:0})} versus a spot of ₹${S0.toLocaleString('en-IN',{maximumFractionDigits:0})} (${upBias?'a mild upward':'a mild downward'} drift over the horizon). The 90% confidence interval spans roughly ₹${p5.toLocaleString('en-IN',{maximumFractionDigits:0})} to ₹${p95.toLocaleString('en-IN',{maximumFractionDigits:0})}, with a ${pct(cUp).toFixed(0)}% probability of ending higher than today and a ${pct(cNewHigh).toFixed(0)}% chance of tagging a fresh 52-week high intraday along the way. As with any GBM model, this assumes constant volatility and log-normal returns, so it will understate tail risk around discrete events (earnings, RBI policy, geopolitical shocks) relative to the fatter tails seen historically.`;
+document.getElementById('interpText').textContent = interp;
+</script>
+</body>
+</html>
+

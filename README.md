@@ -55,7 +55,7 @@ This project helps in understanding:
 
 ## 📸 Preview  
 
-![Dashboard]s
+![Dashboard](https://github.com/tusharjha-bit/Dashboard/blob/main/dashboard.png?raw=true)
 
 
 ---
